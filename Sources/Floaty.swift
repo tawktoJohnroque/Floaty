@@ -405,7 +405,7 @@ open class Floaty: UIView {
     if(items.count > 0){
       
       setOverlayView()
-      self.superview?.insertSubview(overlayView, aboveSubview: self)
+//      self.superview?.insertSubview(overlayView, aboveSubview: self)
       self.superview?.bringSubviewToFront(self)
       if autoCloseOnOverlayTap {
         overlayView.addTarget(self, action: #selector(close), for: UIControl.Event.touchUpInside)
