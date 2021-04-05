@@ -386,6 +386,77 @@ open class Floaty: UIView {
     setShadow()
   }
   
+  
+  @objc open func openWithoutNotifyingDelegate() {
+    if handleFirstItemDirectly, let item = items.first, let handler = item.handler {
+      handler(item)
+      return
+    }
+    
+    if let shouldOpen = fabDelegate?.floatyShouldOpen?(self), shouldOpen == false {
+      return
+    }
+    
+    let animationGroup = DispatchGroup()
+    
+    if(items.count > 0){
+      
+      setOverlayView()
+      //      self.superview?.insertSubview(overlayView, aboveSubview: self)
+      self.superview?.bringSubviewToFront(self)
+      if autoCloseOnOverlayTap {
+        overlayView.addTarget(self, action: #selector(close), for: UIControl.Event.touchUpInside)
+      } else {
+        overlayView.isUserInteractionEnabled = false
+      }
+      
+      overlayViewDidCompleteOpenAnimation = false
+      animationGroup.enter()
+      UIView.animate(withDuration: 0.3, delay: 0,
+                     usingSpringWithDamping: 0.55,
+                     initialSpringVelocity: 0.3,
+                     options: UIView.AnimationOptions(), animations: { () -> Void in
+                      self.plusLayer.transform = CATransform3DMakeRotation(self.degreesToRadians(self.rotationDegrees), 0.0, 0.0, 1.0)
+                      self.buttonImageView.transform = CGAffineTransform(rotationAngle: self.degreesToRadians(self.rotationDegrees))
+                      self.overlayView.alpha = 1
+                     }, completion: {(f) -> Void in
+                      self.overlayViewDidCompleteOpenAnimation = true
+                      animationGroup.leave()
+                     })
+      
+      switch openAnimationType {
+      case .pop:
+        if (fabDelegate?.shallWorkHorizontal?() ?? false) {
+          popAnimationWithOpenLandscape(group: animationGroup)
+        } else {
+          popAnimationWithOpen(group: animationGroup)
+        }
+      case .fade:
+        fadeAnimationWithOpen(group: animationGroup)
+      case .slideLeft:
+        slideLeftAnimationWithOpen(group: animationGroup)
+      case .slideUp:
+        slideUpAnimationWithOpen(group: animationGroup)
+      case .slideDown:
+        slideDownAnimationWithOpen(group: animationGroup)
+      case .fullCircular:
+        cirularAnimationWithOpen(itemCount: self.items.count, group: animationGroup)
+      case .semiCircular:
+        cirularAnimationWithOpen(itemCount: self.items.count*2, group: animationGroup)
+      case .quadCircular:
+        cirularAnimationWithOpen(itemCount: self.items.count*4, group: animationGroup)
+      case .none:
+        noneAnimationWithOpen()
+      }
+      
+      UIAccessibility.post(notification: UIAccessibility.Notification.layoutChanged, argument: items.first);
+    }
+    
+    circleLayer.backgroundColor = self.selectedColor != nil ? self.selectedColor?.cgColor : self.buttonColor.cgColor
+    
+    closed = false
+  }
+  
   /**
    Items open.
    */
@@ -463,6 +534,56 @@ open class Floaty: UIView {
     
     fabDelegate?.floatyOpened?(self)
     closed = false
+  }
+  
+  @objc open func closeWithoutNotifyingDelegate() {
+    if let shouldClose = fabDelegate?.floatyShouldClose?(self), shouldClose == false {
+      return
+    }
+    
+    let animationGroup = DispatchGroup()
+    
+    if(items.count > 0){
+      self.overlayView.removeTarget(self, action: #selector(close), for: UIControl.Event.touchUpInside)
+      animationGroup.enter()
+      UIView.animate(withDuration: 0.3, delay: 0,
+                     usingSpringWithDamping: 0.6,
+                     initialSpringVelocity: 0.8,
+                     options: [], animations: { () -> Void in
+                      self.plusLayer.transform = CATransform3DMakeRotation(self.degreesToRadians(0), 0.0, 0.0, 1.0)
+                      self.buttonImageView.transform = CGAffineTransform(rotationAngle: self.degreesToRadians(0))
+                      self.overlayView.alpha = 0
+                     }, completion: {(f) -> Void in
+                      if self.overlayViewDidCompleteOpenAnimation {
+                        self.overlayView.removeFromSuperview()
+                      }
+                      animationGroup.leave()
+                     })
+      
+      
+      switch openAnimationType {
+      case .pop:
+        popAnimationWithClose(group: animationGroup)
+      case .fade:
+        fadeAnimationWithClose(group: animationGroup)
+      case .slideLeft:
+        slideLeftAnimationWithClose(group: animationGroup)
+      case .slideUp:
+        slideUpAnimationWithClose(group: animationGroup)
+      case .slideDown:
+        slideDownAnimationWithClose(group: animationGroup)
+      case .fullCircular, .semiCircular , .quadCircular:
+        cirularAnimationWithClose(group: animationGroup)
+      case .none:
+        noneAnimationWithClose()
+      }
+      UIAccessibility.post(notification: UIAccessibility.Notification.layoutChanged, argument: self);
+    }
+    
+    
+    circleLayer.backgroundColor = self.buttonColor.cgColor
+    
+    closed = true
   }
   
   /**
@@ -704,6 +825,13 @@ open class Floaty: UIView {
   @objc open func removeItem(index: Int) {
     items[index].removeFromSuperview()
     items.remove(at: index)
+  }
+  
+  @objc open func removeAllItems() {
+    for item in items {
+      item.removeFromSuperview()
+    }
+    items.removeAll()
   }
   
   @objc open override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
