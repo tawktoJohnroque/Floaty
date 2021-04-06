@@ -36,7 +36,11 @@ open class FloatyItem: UIView {
   /**
    Button color.
    */
-  @objc open var buttonColor: UIColor = UIColor.white
+  @objc open var buttonColor: UIColor = UIColor.white {
+    didSet {
+      circleLayer.backgroundColor = buttonColor.cgColor
+    }
+  }
   
   /**
    Title label color.
